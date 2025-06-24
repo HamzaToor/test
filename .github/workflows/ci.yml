@@ -32,8 +32,28 @@ jobs:
       - name: Run ESLint Security Plugin
         run: |
           npm install -g eslint eslint-plugin-security
-          eslint --init --yes || true
-          eslint . --ext .js --format json > eslint-results.json || true
+          # Create ESLint config file for v9
+          cat > eslint.config.js << 'EOF'
+          import security from 'eslint-plugin-security';
+          
+          export default [
+            {
+              plugins: {
+                security
+              },
+              rules: {
+                ...security.configs.recommended.rules,
+                'no-unused-vars': 'warn',
+                'no-console': 'off'
+              },
+              languageOptions: {
+                ecmaVersion: 2022,
+                sourceType: 'module'
+              }
+            }
+          ];
+          EOF
+          eslint . --format json > eslint-results.json || true
           
       - name: Run npm audit
         run: |
@@ -89,7 +109,25 @@ jobs:
       - name: Run ESLint
         run: |
           if find . -name "*.js" -type f | head -1 | grep -q .; then
-            eslint . --ext .js || true
+            # Create basic ESLint config if none exists
+            if [ ! -f eslint.config.js ] && [ ! -f .eslintrc.js ] && [ ! -f .eslintrc.json ]; then
+              cat > eslint.config.js << 'EOF'
+          export default [
+            {
+              rules: {
+                'no-unused-vars': 'warn',
+                'no-console': 'off',
+                'semi': ['error', 'always']
+              },
+              languageOptions: {
+                ecmaVersion: 2022,
+                sourceType: 'module'
+              }
+            }
+          ];
+          EOF
+            fi
+            eslint . || true
           else
             echo "No JavaScript files found"
           fi
