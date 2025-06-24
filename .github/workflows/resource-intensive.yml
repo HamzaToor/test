@@ -1,0 +1,228 @@
+name: Resource Intensive Jobs
+
+on:
+  workflow_dispatch:  # Manual trigger only to avoid accidental billing
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM
+
+jobs:
+  heavy_compute:
+    runs-on: ubuntu-latest
+    name: Heavy Computation Job
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: CPU Intensive Task
+        run: |
+          echo "Running CPU intensive operations..."
+          # Simulate heavy computation
+          for i in {1..1000}; do
+            echo "Processing batch $i"
+            python3 -c "
+          import time
+          import math
+          start = time.time()
+          # CPU intensive calculation
+          result = sum(math.sqrt(i) for i in range(100000))
+          print(f'Batch $i completed in {time.time() - start:.2f}s, result: {result}')
+          "
+          done
+          
+      - name: Memory Intensive Task
+        run: |
+          echo "Running memory intensive operations..."
+          python3 -c "
+          import time
+          # Create large data structures
+          big_list = []
+          for i in range(1000000):
+              big_list.append(f'data_item_{i}' * 10)
+              if i % 100000 == 0:
+                  print(f'Created {i} items, memory usage growing...')
+          print(f'Final list size: {len(big_list)} items')
+          "
+
+  parallel_matrix_build:
+    runs-on: ubuntu-latest
+    name: Parallel Matrix Build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [3.8, 3.9, '3.10', '3.11']
+        node-version: [16, 18, 20]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          
+      - name: Long running build simulation
+        run: |
+          echo "Building on ${{ matrix.os }} with Python ${{ matrix.python-version }} and Node ${{ matrix.node-version }}"
+          # Simulate long build process
+          sleep 300  # 5 minutes per job
+          echo "Build completed"
+
+  docker_builds:
+    runs-on: ubuntu-latest
+    name: Multiple Docker Builds
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Create sample Dockerfiles
+        run: |
+          # Create multiple Dockerfiles for different scenarios
+          mkdir -p docker-builds
+          
+          cat > docker-builds/Dockerfile.python << 'EOF'
+          FROM python:3.11-slim
+          WORKDIR /app
+          COPY . .
+          RUN pip install --no-cache-dir -r requirements.txt || echo "No requirements.txt"
+          RUN python -c "import time; time.sleep(60)"  # Simulate long build
+          CMD ["python", "main.py"]
+          EOF
+          
+          cat > docker-builds/Dockerfile.node << 'EOF'
+          FROM node:18-alpine
+          WORKDIR /app
+          COPY package*.json ./
+          RUN npm ci --only=production || echo "No package.json"
+          RUN node -e "setTimeout(() => console.log('Build complete'), 60000)"
+          COPY . .
+          CMD ["node", "server.js"]
+          EOF
+          
+          cat > docker-builds/Dockerfile.ruby << 'EOF'
+          FROM ruby:3.0-slim
+          WORKDIR /app
+          COPY Gemfile* ./
+          RUN bundle install || echo "No Gemfile"
+          RUN ruby -e "sleep 60; puts 'Build complete'"
+          COPY . .
+          CMD ["ruby", "app.rb"]
+          EOF
+          
+      - name: Build Python Docker image
+        run: |
+          docker build -f docker-builds/Dockerfile.python -t test-python:latest .
+          
+      - name: Build Node Docker image
+        run: |
+          docker build -f docker-builds/Dockerfile.node -t test-node:latest .
+          
+      - name: Build Ruby Docker image
+        run: |
+          docker build -f docker-builds/Dockerfile.ruby -t test-ruby:latest .
+
+  security_scans_intensive:
+    runs-on: ubuntu-latest
+    name: Intensive Security Scanning
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup multiple security tools
+        run: |
+          # Install various security scanning tools
+          pip install bandit safety semgrep
+          npm install -g retire snyk
+          gem install brakeman bundler-audit
+          
+      - name: Deep code analysis
+        run: |
+          echo "Running comprehensive security scans..."
+          
+          # Python security scans
+          bandit -r . -f json -o bandit-report.json || true
+          safety check --json --output safety-report.json || true
+          semgrep --config=auto --json --output=semgrep-report.json . || true
+          
+          # JavaScript security scans
+          retire --outputformat json --outputpath retire-report.json . || true
+          
+          # Create sample files for more intensive scanning
+          mkdir -p scan-targets
+          for i in {1..100}; do
+            echo "# Sample Python file $i" > scan-targets/sample_$i.py
+            echo "import os, subprocess, pickle" >> scan-targets/sample_$i.py
+            echo "def process_data(): pass" >> scan-targets/sample_$i.py
+          done
+          
+          # Re-run scans on larger codebase
+          bandit -r scan-targets/ || true
+          
+      - name: Upload all scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: intensive-security-scans
+          path: |
+            *-report.json
+        if: always()
+
+  load_testing:
+    runs-on: ubuntu-latest
+    name: Load Testing Simulation
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install load testing tools
+        run: |
+          pip install locust requests
+          npm install -g artillery
+          
+      - name: Create sample web server
+        run: |
+          cat > simple_server.py << 'EOF'
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json
+          import time
+          import threading
+          
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  # Simulate processing time
+                  time.sleep(0.1)
+                  self.send_response(200)
+                  self.send_header('Content-type', 'application/json')
+                  self.end_headers()
+                  response = {'message': 'Hello World', 'timestamp': time.time()}
+                  self.wfile.write(json.dumps(response).encode())
+          
+          def run_server():
+              server = HTTPServer(('localhost', 8000), Handler)
+              server.serve_forever()
+          
+          if __name__ == '__main__':
+              run_server()
+          EOF
+          
+      - name: Start server and run load tests
+        run: |
+          # Start server in background
+          python simple_server.py &
+          SERVER_PID=$!
+          sleep 5
+          
+          # Run load tests
+          echo "Running load tests..."
+          for i in {1..1000}; do
+            curl -s http://localhost:8000 > /dev/null &
+            if [ $((i % 100)) -eq 0 ]; then
+              echo "Completed $i requests"
+              wait  # Wait for batch to complete
+            fi
+          done
+          
+          # Cleanup
+          kill $SERVER_PID || true
